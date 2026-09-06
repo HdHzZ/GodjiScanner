@@ -1,0 +1,2 @@
+"""Read-only discovery core for GodjiOS agents."""
+__version__ = "0.3.1"

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GodjiScanner result v1",
+  "type": "object",
+  "required": ["schemaVersion", "scannerVersion", "scannedAt", "items", "matches", "warnings", "partial", "durationSeconds"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "scannerVersion": {"type": "string"},
+    "scannedAt": {"type": "string", "format": "date-time"},
+    "clubId": {"type": "string"},
+    "catalogSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "partial": {"type": "boolean"},
+    "durationSeconds": {"type": "number", "minimum": 0},
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "type", "installPath", "launch", "status", "confidence", "sources"],
+        "properties": {
+          "id": {"type": "string"},
+          "title": {"type": "string"},
+          "type": {"enum": ["game", "program"]},
+          "installPath": {"type": ["string", "null"]},
+          "launch": {
+            "type": "object",
+            "required": ["path", "args", "workingDirectory"],
+            "properties": {
+              "path": {"type": "string"},
+              "args": {"type": "array", "items": {"type": "string"}},
+              "workingDirectory": {"type": ["string", "null"]},
+              "kind": {"enum": ["executable", "script", "uri"]}
+            }
+          },
+          "displayGroup": {"enum": ["applications", "candidates", "components"]},
+          "relatedTo": {"type": ["string", "null"]},
+          "argumentsSource": {"enum": ["shortcut", "manifest", "built-in", "catalog", "unknown"]},
+          "reviewReason": {"type": "string"},
+          "iconFile": {"type": "string"},
+          "iconOrigin": {"enum": ["local-executable", "placeholder"]},
+          "status": {"enum": ["found", "needs_review"]},
+          "confidence": {"enum": ["high", "low"]},
+          "sources": {"type": "array", "items": {"enum": ["steam", "epic", "registry", "shortcut", "filesystem", "catalog-path", "url-shortcut", "windows-settings"]}},
+          "identity": {"type": ["object", "null"]},
+          "reason": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["catalogId", "title", "status", "itemId", "candidateIds", "preserveArgs"],
+        "properties": {
+          "catalogId": {"type": "string"},
+          "title": {"type": "string"},
+          "status": {"enum": ["found", "needs_review", "not_found"]},
+          "itemId": {"type": ["string", "null"]},
+          "candidateIds": {"type": "array", "items": {"type": "string"}},
+          "preserveArgs": {"type": "boolean"}
+        }
+      }
+    },
+    "warnings": {"type": "array", "items": {"type": "object"}}
+  }
+}

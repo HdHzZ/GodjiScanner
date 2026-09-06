@@ -1,0 +1,9 @@
+{
+  "version": 3,
+  "clubId": "test",
+  "categories": [],
+  "items": [
+    {"id": "wanted-cs2", "title": "Counter-Strike 2", "type": "game", "visible": true},
+    {"id": "wanted-discord", "title": "Discord", "type": "program", "visible": true}
+  ]
+}
