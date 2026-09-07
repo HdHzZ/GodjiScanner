@@ -119,6 +119,9 @@ def run_automatic(base=None, roots=None, system=True, pause=None, open_review=Fa
                           "items": sorted(scanner.items.values(), key=lambda i: i["title"].casefold()),
                           "matches": [], "warnings": scanner.warnings + [{"source": "scan", "message": "Поиск отменён пользователем; сохранены частичные результаты"}],
                           "partial": True, "durationSeconds": 0, "cancelled": True}
+            # Persist the useful discovery data before optional icon extraction.
+            # Icon resources can be slow or unavailable on a real club PC.
+            save_reports(result, destination)
             if not result.get("cancelled") and system:
                 print("Извлечение локальных иконок…", flush=True)
                 try:
@@ -126,6 +129,7 @@ def run_automatic(base=None, roots=None, system=True, pause=None, open_review=Fa
                     extract_icons(result, destination)
                 except Exception as error:
                     result["warnings"].append({"source": "icons", "message": str(error)})
+            # Write icon references, or warnings, back into the existing report.
             save_reports(result, destination)
             if open_review and not result.get("cancelled"):
                 from .review import run_review

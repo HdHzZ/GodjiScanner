@@ -41,6 +41,22 @@ class AutomaticTests(unittest.TestCase):
             review.assert_called_once()
             self.assertEqual(review.call_args.args[1], result_dir / "review.json")
 
+    def test_scan_is_saved_before_optional_icon_extraction(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            def completed_scan(scanner, **_):
+                scanner.add("NVIDIA App", "C:/NVIDIA/NVIDIA App.exe", source="shortcut")
+                return {"items": list(scanner.items.values()), "partial": False, "warnings": []}
+            def icons_after_scan(_, folder):
+                self.assertTrue((Path(folder) / "scan.json").is_file())
+                raise RuntimeError("icon service unavailable")
+            with patch.object(Scanner, "run", completed_scan):
+                with patch("godji_scanner.icons.extract_icons", icons_after_scan):
+                    self.assertEqual(run_automatic(base=base, roots=[], system=True, pause=False), 0)
+            data = json.loads((next((base / "results").iterdir()) / "scan.json").read_text(encoding="utf-8"))
+            self.assertEqual(data["items"][0]["title"], "NVIDIA App")
+            self.assertTrue(any(w["source"] == "icons" for w in data["warnings"]))
+
     def test_cancelled_scan_keeps_partial_results(self):
         with tempfile.TemporaryDirectory() as temp:
             def interrupted(scanner, **kwargs):
