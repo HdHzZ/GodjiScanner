@@ -13,7 +13,7 @@ class AutomaticTests(unittest.TestCase):
     def test_no_arguments_selects_automatic_mode(self):
         with patch("godji_scanner.automatic.run_automatic", return_value=0) as automatic:
             self.assertEqual(main([]), 0)
-            automatic.assert_called_once_with()
+            automatic.assert_called_once_with(open_review=True)
 
     def test_without_catalog_produces_reports_with_real_executable_path(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -23,7 +23,7 @@ class AutomaticTests(unittest.TestCase):
             exe = games / "Game.exe"
             exe.touch()
             with patch("godji_scanner.windows.fixed_drives", return_value=[games]):
-                self.assertEqual(run_automatic(base=base, system=False, pause=False), 0)
+                self.assertEqual(run_automatic(base=base, system=False, pause=False, open_review=False), 0)
             folder = next((base / "results").iterdir())
             data = json.loads((folder / "scan.json").read_text(encoding="utf-8"))
             self.assertEqual(data["items"][0]["launch"]["path"], str(exe))
@@ -31,13 +31,23 @@ class AutomaticTests(unittest.TestCase):
             for name in ["report.html", "applications.csv", "scan.log"]:
                 self.assertTrue((folder / name).is_file())
 
+    def test_automatic_mode_opens_manual_review(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            with patch("godji_scanner.review.run_review") as review:
+                with patch("godji_scanner.windows.fixed_drives", return_value=[]):
+                    self.assertEqual(run_automatic(base=base, system=False, pause=False, open_review=True), 0)
+            result_dir = next((base / "results").iterdir())
+            review.assert_called_once()
+            self.assertEqual(review.call_args.args[1], result_dir / "review.json")
+
     def test_cancelled_scan_keeps_partial_results(self):
         with tempfile.TemporaryDirectory() as temp:
             def interrupted(scanner, **kwargs):
                 scanner.add("Test", "C:/Game.exe")
                 raise Cancelled()
             with patch.object(Scanner, "run", interrupted):
-                self.assertEqual(run_automatic(base=temp, roots=[temp], system=False, pause=False), 130)
+                self.assertEqual(run_automatic(base=temp, roots=[temp], system=False, pause=False, open_review=False), 130)
             folder = next((Path(temp) / "results").iterdir())
             data = json.loads((folder / "scan.json").read_text(encoding="utf-8"))
             self.assertTrue(data["partial"])

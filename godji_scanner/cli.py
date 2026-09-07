@@ -39,7 +39,7 @@ def main(argv=None):
     actual_args = sys.argv[1:] if argv is None else argv
     if not actual_args:
         from .automatic import run_automatic
-        return run_automatic()
+        return run_automatic(open_review=True)
     parser = argparse.ArgumentParser(description="GodjiOS discovery bridge (Windows 10/11)")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)

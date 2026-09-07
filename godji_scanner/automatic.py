@@ -80,7 +80,7 @@ def re_safe_icon(path):
     return bool(re.fullmatch(r"icons/icon-\d+\.png", path))
 
 
-def run_automatic(base=None, roots=None, system=True, pause=None):
+def run_automatic(base=None, roots=None, system=True, pause=None, open_review=False):
     from .windows import fixed_drives
     if base is None:
         base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent
@@ -127,6 +127,10 @@ def run_automatic(base=None, roots=None, system=True, pause=None):
                 except Exception as error:
                     result["warnings"].append({"source": "icons", "message": str(error)})
             save_reports(result, destination)
+            if open_review and not result.get("cancelled"):
+                from .review import run_review
+                print("Открываю окно ручного отбора…", flush=True)
+                run_review(result, destination / "review.json")
         print(f"\nРекомендуемых карточек: {result.get('summary', {}).get('applications', 0)}.", flush=True)
         print(f"Диагностических записей: {len(result['items']) - result.get('summary', {}).get('applications', 0)}.", flush=True)
         if result["partial"]:
