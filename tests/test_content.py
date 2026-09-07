@@ -35,6 +35,19 @@ class ContentTests(unittest.TestCase):
         self.assertEqual(by_name["Unknown mouse tool"]["displayGroup"], "candidates")
         self.assertEqual(len(result["items"]), 5)
 
+    def test_only_club_relevant_shortcuts_are_promoted(self):
+        scanner = Scanner()
+        scanner.add("Battle.net", "C:/Battle.net/Battle.net.exe", source="shortcut")
+        scanner.add("NVIDIA App", "C:/NVIDIA/NVIDIA App.exe", source="shortcut")
+        scanner.add("Microsoft Word", "C:/Office/WINWORD.EXE", source="shortcut")
+        scanner.add("Microsoft Visual C++", "C:/ProgramData/Package Cache/vcredist.exe", source="registry")
+        result = classify({"items": list(scanner.items.values())})
+        by_name = {i["title"]: i for i in result["items"]}
+        self.assertEqual(by_name["Battle.net"]["displayGroup"], "applications")
+        self.assertEqual(by_name["NVIDIA App"]["displayGroup"], "applications")
+        self.assertEqual(by_name["Microsoft Word"]["displayGroup"], "candidates")
+        self.assertEqual(by_name["Microsoft Visual C++"]["displayGroup"], "components")
+
     def test_scripts_and_url_are_discovered_without_execution(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

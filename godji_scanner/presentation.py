@@ -17,6 +17,17 @@ def classify(result):
                          r"ace-service.*|acep_report.*|elevated_tracing_service|notification_helper|"
                          r"conhost|chrome_pwa_launcher|werfault|hpatchz|xdelta3|zstd|"
                          r"steamservice|steamwebhelper|steamerrorreporter.*)$", re.I)
+    game_launchers = re.compile(
+        r"steam|epic games|battle\.net|battlestate|bsglauncher|ea (app|desktop)|ubisoft|rockstar games|"
+        r"riot client|league of legends|lesta|vk play|4game|hoyoplay|gog galaxy|wargaming|my\.games|tlauncher|minecraft launcher",
+        re.I)
+    device_software = re.compile(
+        r"logitech|g hub|razer|synapse|steelseries|corsair|icue|hyperx|lamzu|redragon|bloody|a4tech|akko|"
+        r"wooting|endgame gear|glorious|pulsar|zowie|xtrfy|asus armoury|armoury crate|rog |msi center|"
+        r"nvidia (app|control panel|broadcast)|amd software|adrenalin|realtek|nahimic|sonic studio|dts|dolby|"
+        r"gigabyte control|aorus|keychron|vgn|vxe|dareu|rapoo|fantech|roccat|turtle beach",
+        re.I)
+    installer_path = re.compile(r"(?:\\|/)(?:package cache|windows\\installer)(?:\\|/)", re.I)
     groups = []
     steam_games = {str((game.get("identity") or {}).get("appId")): game for game in games}
     epic_games = {str((game.get("identity") or {}).get("appId")): game for game in games
@@ -46,8 +57,22 @@ def classify(result):
                 item["reviewReason"] = "Дублирующий Steam-ярлык; основная карточка использует подтверждённый Steam AppID"
             else:
                 item["displayGroup"] = "candidates"
-        elif sources & {"windows-settings", "steam", "epic", "shortcut", "registry", "catalog-path"}:
+        elif sources & {"windows-settings", "catalog-path"}:
             item["displayGroup"] = "applications"
+            item["contentKind"] = "system" if "windows-settings" in sources else "catalog"
+        elif (item.get("identity") or {}).get("provider") in {"steam", "epic"} and item.get("installPath"):
+            item["displayGroup"] = "applications"
+            item["contentKind"] = "game"
+        elif game_launchers.search(item["title"]) or game_launchers.search(path):
+            item["displayGroup"] = "applications"
+            item["contentKind"] = "game-launcher"
+        elif device_software.search(item["title"]) or device_software.search(path):
+            item["displayGroup"] = "applications"
+            item["contentKind"] = "device-software"
+        elif installer_path.search(path) or re.match(r"^(?:uninstall|install |register |start |stop )", item["title"], re.I):
+            item["displayGroup"] = "components"
+            item["contentKind"] = "installer-or-service"
+            item["reviewReason"] = "Установщик, деинсталлятор или служебная команда; не является карточкой клуба"
         else:
             owner = next((game for game in games if norm(path).startswith(norm(game["installPath"]) + "\\")), None)
             if owner:
@@ -57,6 +82,9 @@ def classify(result):
                 item["displayGroup"] = "components"
             else:
                 item["displayGroup"] = "candidates"
+                item["contentKind"] = "other-software"
+                if sources & {"shortcut", "registry"}:
+                    item["reviewReason"] = "Обычное ПО из ярлыка или реестра; добавьте в каталог только при необходимости"
     # Keep launch variants distinct, even if they use one executable. The report
     # groups only filesystem components under a manifest-backed game.
     for game in games:

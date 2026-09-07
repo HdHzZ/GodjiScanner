@@ -41,8 +41,12 @@ def save_reports(result, folder):
         writer = csv.writer(file, delimiter=";")
         writer.writerow(headings)
         # Keep spreadsheet viewers from interpreting discovered names as formulas.
+        # This is the operator's compact list. The complete diagnostic inventory
+        # remains available in scan.json and the closed report sections.
+        primary_rows = [row for row, item in zip(rows, result["items"])
+                        if item["displayGroup"] == "applications"]
         writer.writerows([["'" + value if value.startswith(("=", "+", "-", "@", "\t", "\r")) else value
-                           for value in row] for row in rows])
+                           for value in row] for row in primary_rows])
     esc = html.escape
     header = "".join(f"<th>{esc(h)}</th>" for h in headings)
     bodies = {key: [] for key in ["applications", "candidates", "components"]}
@@ -52,7 +56,7 @@ def save_reports(result, folder):
         cells = [f"<td>{prefix}{esc(row[0])}</td>"] + [f"<td>{esc(v)}</td>" for v in row[1:]]
         bodies[item["displayGroup"]].append("<tr>" + "".join(cells) + "</tr>")
     sections = []
-    for key, label in [("applications", "Приложения, игры и настройки"), ("candidates", "Кандидаты — нужна проверка"), ("components", "Компоненты игр и служебные файлы")]:
+    for key, label in [("applications", "Рекомендуемые игры, приложения и настройки"), ("candidates", "Прочее ПО — добавить вручную при необходимости"), ("components", "Установщики и служебные файлы")]:
         content = "".join(bodies[key])
         sections.append(f'<details {"open" if key == "applications" else ""}><summary>{label}: {len(bodies[key])}</summary><table><thead><tr>{header}</tr></thead><tbody>{content}</tbody></table></details>')
     body = "".join(sections)
@@ -64,9 +68,9 @@ def save_reports(result, folder):
 body{{font:15px system-ui,sans-serif;margin:28px;background:#f4f6fa;color:#172033}}
 table{{border-collapse:collapse;width:100%;background:white}}th,td{{padding:10px;border:1px solid #dce1eb;text-align:left;vertical-align:top;overflow-wrap:anywhere;max-width:360px}}
 th{{background:#e6ebf5;position:sticky;top:0}}h1{{font-size:26px}}.note{{padding:14px;background:#fff;border-left:4px solid #657ce5}}li{{overflow-wrap:anywhere}}
-</style><h1>{state}</h1><p>Всего находок: {len(rows)}. Подтверждено: {confirmed}. Нужна проверка: {len(rows)-confirmed}.</p>
-<p class="note">Это список обнаруженного ПО и кандидатов. Наличие EXE не гарантирует, что это отдельная игра или правильный способ запуска. Сканер ничего не запускал. Для поиска по странице нажмите Ctrl+F.</p>
-<p>Результат для передачи: <b>scan.json</b>. Таблица: <b>applications.csv</b>.</p>
+</style><h1>{state}</h1><p>Рекомендуемых карточек: {len(bodies['applications'])}. Дополнительных диагностических записей: {len(rows)-len(bodies['applications'])}.</p>
+<p class="note">Главный раздел содержит игры, игровые лаунчеры, ПО устройств и системные настройки. Остальные записи сохранены ниже для проверки, но не предназначены для импорта в каталог. Сканер ничего не запускал. Для поиска по странице нажмите Ctrl+F.</p>
+<p>Полный результат: <b>scan.json</b>. Таблица рекомендуемых карточек: <b>applications.csv</b>.</p>
 <ul>{notices}</ul>{body}</html>'''
     (folder / "report.html").write_text(report, encoding="utf-8")
 
@@ -123,7 +127,8 @@ def run_automatic(base=None, roots=None, system=True, pause=None):
                 except Exception as error:
                     result["warnings"].append({"source": "icons", "message": str(error)})
             save_reports(result, destination)
-        print(f"\nСохранено находок: {len(result['items'])}.", flush=True)
+        print(f"\nРекомендуемых карточек: {result.get('summary', {}).get('applications', 0)}.", flush=True)
+        print(f"Диагностических записей: {len(result['items']) - result.get('summary', {}).get('applications', 0)}.", flush=True)
         if result["partial"]:
             print("Поиск неполный: проверьте предупреждения в отчёте.", flush=True)
         print(f"Откройте отчёт: {destination / 'report.html'}", flush=True)

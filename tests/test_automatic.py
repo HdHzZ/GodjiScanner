@@ -48,7 +48,8 @@ class AutomaticTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             scanner = Scanner()
             scanner.add('<script>alert(1)</script>', 'C:/test.exe')
-            scanner.add('=1+1', 'C:/other.exe')
+            scanner.add('=1+1', 'C:/NVIDIA/NVIDIA App.exe')
+            scanner.add('Word', 'C:/Office/WINWORD.EXE', source='shortcut')
             result = {"items": list(scanner.items.values()), "partial": False, "warnings": []}
             save_reports(result, Path(temp))
             html = (Path(temp) / "report.html").read_text(encoding="utf-8")
@@ -56,6 +57,7 @@ class AutomaticTests(unittest.TestCase):
             self.assertIn('&lt;script&gt;', html)
             csv = (Path(temp) / "applications.csv").read_text(encoding="utf-8-sig")
             self.assertIn("'=1+1", csv)
+            self.assertNotIn("Word", csv)
 
 
 if __name__ == "__main__":
