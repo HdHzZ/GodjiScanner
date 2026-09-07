@@ -11,6 +11,7 @@ GodjiScanner.exe scan [--catalog PATH] [--root PATH ...] [--all-drives]
                      [--output PATH] [--cancel-file PATH] [--max-files N]
                      [--steam-root PATH ...] [--epic-manifests PATH ...] [--no-system]
 GodjiScanner.exe export --scan PATH [--catalog PATH] --output NEW_ZIP [--approve ITEM_ID ...]
+GodjiScanner.exe proposals --scan PATH --catalog PATH --machine-id PC_ID [--output PATH]
 ```
 
 - `stdout`: один JSON-документ результата; при `scan --output` пустой, результат атомарно записывается в файл. `export` печатает `{output, items, visible}`. `--help` и `--version` — обычный текст.
@@ -65,6 +66,8 @@ GodjiScanner.exe export --scan PATH [--catalog PATH] --output NEW_ZIP [--approve
 ID находки — хеш нормализованного пути запуска и списка аргументов. При смене пути или аргументов ID изменяется. Для идентификации Steam между компьютерами используйте `identity.provider` и `identity.appId`; для записей шаблона — `catalogId`. Не используйте ID находки как глобальный ID игры.
 
 `catalogSha256` присутствует для скана с шаблоном и связывает экспорт с точным исходным ZIP/JSON. Сканер не принимает несовпадающий шаблон. Не меняйте этот хеш при пользовательском редактировании результата.
+
+`proposals` записывает независимый от транспорта JSON-план изменений. Он не выполняет HTTP-запросы и включает только однозначные сопоставления с высокой уверенностью, у которых путь или аргументы действительно изменились. Агент GodjiOS сможет передать этот файл в write API после появления endpoint из технической задачи.
 
 ## Границы ответственности
 

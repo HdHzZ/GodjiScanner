@@ -8,6 +8,7 @@ import tempfile
 from . import __version__
 from .catalog import read_catalog, export_catalog
 from .core import Scanner, Cancelled
+from .proposals import build_proposals
 
 
 def emit(value):
@@ -57,6 +58,11 @@ def main(argv=None):
     export.add_argument("--catalog", help="Same original ZIP used by scan, including covers")
     export.add_argument("--output", required=True, help="New ZIP filename")
     export.add_argument("--approve", action="append", default=[], help="Explicitly approve one reviewed detected item ID (repeatable)")
+    proposals = commands.add_parser("proposals", help="Create safe launch-update proposals for a future GodjiOS API")
+    proposals.add_argument("--scan", required=True, help="JSON result from scan")
+    proposals.add_argument("--catalog", required=True, help="The exact GodjiOS catalog used for scan")
+    proposals.add_argument("--machine-id", required=True, help="Stable identifier of the scanned gaming PC")
+    proposals.add_argument("--output", help="Write proposal JSON atomically to this file instead of stdout")
     args = parser.parse_args(actual_args)
     try:
         if args.command == "scan":
@@ -77,7 +83,7 @@ def main(argv=None):
                 import hashlib
                 result["catalogSha256"] = hashlib.sha256(Path(args.catalog).read_bytes()).hexdigest()
             write_result(result, args.output)
-        else:
+        elif args.command == "export":
             result = json.loads(Path(args.scan).read_text(encoding="utf-8-sig"))
             if result.get("schemaVersion") != 1 or not isinstance(result.get("items"), list):
                 raise ValueError("Unsupported scan schema")
@@ -103,6 +109,12 @@ def main(argv=None):
                 emit({"event": "warning", "source": "export", "message":
                       "workingDirectory is retained in scan JSON but omitted from ZIP: the supplied GodjiOS format has no demonstrated field for it"})
             write_result(export_catalog(result, args.output, args.catalog, assets_root=Path(args.scan).parent), None)
+        else:
+            result = json.loads(Path(args.scan).read_text(encoding="utf-8-sig"))
+            if result.get("schemaVersion") != 1 or not isinstance(result.get("items"), list):
+                raise ValueError("Unsupported scan schema")
+            catalog = read_catalog(args.catalog)
+            write_result(build_proposals(result, catalog, args.machine_id), args.output)
         return 0
     except (Cancelled, KeyboardInterrupt):
         emit({"event": "cancelled"})
