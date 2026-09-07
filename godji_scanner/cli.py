@@ -9,6 +9,7 @@ from . import __version__
 from .catalog import read_catalog, export_catalog
 from .core import Scanner, Cancelled
 from .proposals import build_proposals
+from .review import load_review, run_review
 
 
 def emit(value):
@@ -63,6 +64,10 @@ def main(argv=None):
     proposals.add_argument("--catalog", required=True, help="The exact GodjiOS catalog used for scan")
     proposals.add_argument("--machine-id", required=True, help="Stable identifier of the scanned gaming PC")
     proposals.add_argument("--output", help="Write proposal JSON atomically to this file instead of stdout")
+    review = commands.add_parser("review", help="Open a manual selector for a completed scan")
+    review.add_argument("--scan", required=True, help="JSON result from scan")
+    review.add_argument("--output", help="Review JSON to create; default is review.json next to scan")
+    review.add_argument("--review", help="Existing review JSON to reopen and edit")
     args = parser.parse_args(actual_args)
     try:
         if args.command == "scan":
@@ -109,12 +114,19 @@ def main(argv=None):
                 emit({"event": "warning", "source": "export", "message":
                       "workingDirectory is retained in scan JSON but omitted from ZIP: the supplied GodjiOS format has no demonstrated field for it"})
             write_result(export_catalog(result, args.output, args.catalog, assets_root=Path(args.scan).parent), None)
-        else:
+        elif args.command == "proposals":
             result = json.loads(Path(args.scan).read_text(encoding="utf-8-sig"))
             if result.get("schemaVersion") != 1 or not isinstance(result.get("items"), list):
                 raise ValueError("Unsupported scan schema")
             catalog = read_catalog(args.catalog)
             write_result(build_proposals(result, catalog, args.machine_id), args.output)
+        else:
+            result = json.loads(Path(args.scan).read_text(encoding="utf-8-sig"))
+            if result.get("schemaVersion") != 1 or not isinstance(result.get("items"), list):
+                raise ValueError("Unsupported scan schema")
+            output = args.output or str(Path(args.scan).with_name("review.json"))
+            existing = load_review(args.review) if args.review else None
+            run_review(result, output, existing)
         return 0
     except (Cancelled, KeyboardInterrupt):
         emit({"event": "cancelled"})
