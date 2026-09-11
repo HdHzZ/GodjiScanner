@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import zipfile
 
-from godji_scanner.catalog import export_catalog, read_catalog
+from godji_scanner.catalog import export_catalog, read_catalog, retain_catalog_matches
 from godji_scanner.core import Scanner, Cancelled, parse_vdf
 from godji_scanner.cli import main
 from godji_scanner.windows import split_args
@@ -133,6 +133,15 @@ class ScannerTests(unittest.TestCase):
         result = Scanner().run(catalog=catalog, system=False)
         self.assertEqual(result["matches"][0]["status"], "needs_review")
         self.assertEqual(result["items"][0]["sources"], ["catalog-path"])
+
+    def test_only_catalog_filter_drops_unrelated_discoveries(self):
+        scanner = Scanner()
+        scanner.add("Wanted", "C:/wanted.exe", confirmed=True)
+        scanner.add("Unrelated", "C:/unrelated.exe", confirmed=True)
+        items = list(scanner.items.values())
+        result = {"items": items, "matches": [{"catalogId": "wanted", "itemId": items[0]["id"], "status": "found"}]}
+        retain_catalog_matches(result)
+        self.assertEqual([item["title"] for item in result["items"]], ["Wanted"])
 
     def test_cli_scan_and_approved_export(self):
         (self.root / "Game.exe").touch()

@@ -6,7 +6,7 @@ import sys
 import tempfile
 
 from . import __version__
-from .catalog import read_catalog, export_catalog
+from .catalog import read_catalog, export_catalog, retain_catalog_matches
 from .core import Scanner, Cancelled
 from .proposals import build_proposals
 from .review import load_review, run_review
@@ -45,6 +45,7 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     scan = commands.add_parser("scan", help="Read installed content; never launch it")
     scan.add_argument("--catalog", help="Optional GodjiOS ZIP or JSON template")
+    scan.add_argument("--only-catalog", action="store_true", help="Keep only matches for the supplied catalog in the result")
     scan.add_argument("--root", action="append", default=[], help="Additional folder to recursively search (repeatable)")
     scan.add_argument("--all-drives", action="store_true", help="Deep search all local fixed disks; may take a long time")
     scan.add_argument("--steam-root", action="append", help="Steam client directory (repeatable)")
@@ -68,6 +69,14 @@ def main(argv=None):
     review.add_argument("--scan", required=True, help="JSON result from scan")
     review.add_argument("--output", help="Review JSON to create; default is review.json next to scan")
     review.add_argument("--review", help="Existing review JSON to reopen and edit")
+    club_scan = commands.add_parser("club-scan", help="Scan one club catalog and create a GodjiOS import ZIP")
+    club_scan.add_argument("--catalog", required=True, help="Current GodjiOS catalog ZIP for the club")
+    club_scan.add_argument("--output-dir", required=True, help="New folder for scan, report and import ZIP")
+    club_scan.add_argument("--all-drives", action="store_true", help="Search all local fixed drives for this club")
+    club_scan.add_argument("--include-reviewed", action="store_true", help="Also include non-ambiguous candidates requiring review")
+    clubs = commands.add_parser("clubs", help="Open the club selector and create an import ZIP")
+    clubs.add_argument("--catalogs-dir", default="clubs", help="Folder containing exported club catalog ZIP files")
+    clubs.add_argument("--output-dir", default="club-results", help="Folder where per-club result folders are created")
     args = parser.parse_args(actual_args)
     try:
         if args.command == "scan":
@@ -81,6 +90,10 @@ def main(argv=None):
                 args.root.extend(str(p) for p in fixed_drives())
             scanner = Scanner(emit, args.cancel_file, args.max_files)
             result = scanner.run(args.root, catalog, args.steam_root, args.epic_manifests, not args.no_system)
+            if args.only_catalog:
+                if not catalog:
+                    raise ValueError("--only-catalog requires --catalog")
+                retain_catalog_matches(result)
             if args.icons_dir:
                 from .icons import extract_icons
                 extract_icons(result, args.icons_dir)
@@ -120,13 +133,20 @@ def main(argv=None):
                 raise ValueError("Unsupported scan schema")
             catalog = read_catalog(args.catalog)
             write_result(build_proposals(result, catalog, args.machine_id), args.output)
-        else:
+        elif args.command == "review":
             result = json.loads(Path(args.scan).read_text(encoding="utf-8-sig"))
             if result.get("schemaVersion") != 1 or not isinstance(result.get("items"), list):
                 raise ValueError("Unsupported scan schema")
             output = args.output or str(Path(args.scan).with_name("review.json"))
             existing = load_review(args.review) if args.review else None
             run_review(result, output, existing)
+        elif args.command == "club-scan":
+            from .club import scan_club
+            summary = scan_club(args.catalog, args.output_dir, args.all_drives, args.include_reviewed, emit)
+            write_result(summary, None)
+        else:
+            from .club import run_club_selector
+            run_club_selector(args.catalogs_dir, args.output_dir)
         return 0
     except (Cancelled, KeyboardInterrupt):
         emit({"event": "cancelled"})

@@ -13,6 +13,7 @@ GodjiScanner.exe scan [--catalog PATH] [--root PATH ...] [--all-drives]
 GodjiScanner.exe export --scan PATH [--catalog PATH] --output NEW_ZIP [--approve ITEM_ID ...]
 GodjiScanner.exe proposals --scan PATH --catalog PATH --machine-id PC_ID [--output PATH]
 GodjiScanner.exe review --scan PATH [--output PATH] [--review PREVIOUS_REVIEW]
+GodjiScanner.exe club-scan --catalog CLUB_ZIP --output-dir NEW_FOLDER [--all-drives] [--include-reviewed]
 ```
 
 - `stdout`: один JSON-документ результата; при `scan --output` пустой, результат атомарно записывается в файл. `export` печатает `{output, items, visible}`. `--help` и `--version` — обычный текст.
@@ -71,6 +72,8 @@ ID находки — хеш нормализованного пути запу�
 `proposals` записывает независимый от транспорта JSON-план изменений. Он не выполняет HTTP-запросы и включает только однозначные сопоставления с высокой уверенностью, у которых путь или аргументы действительно изменились. Агент GodjiOS сможет передать этот файл в write API после появления endpoint из технической задачи.
 
 `review` открывает нативное окно ручного отбора и сохраняет отдельный JSON-файл. Каждая запись содержит `itemId`, `selected` и `target`: `client`, `server` или `both`. Сканер не предполагает, что программа с сервера подходит клиентским ПК: назначение можно изменить до сохранения.
+
+`club-scan` предназначен для импорта в один выбранный клуб. Он всегда читает исходный ZIP каталога, сопоставляет только его карточки, сохраняет диагностические результаты только по этим карточкам и создаёт новый `godjios-import.zip`. Неоднозначные совпадения остаются скрытыми, пока явно не передан `--include-reviewed`.
 
 ## Границы ответственности
 

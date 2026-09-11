@@ -6,3 +6,5 @@ GodjiScanner.spec
 .venv/
 output/
 results/
+clubs/*.zip
+club-results/

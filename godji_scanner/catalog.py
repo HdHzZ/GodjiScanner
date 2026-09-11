@@ -38,6 +38,15 @@ def read_catalog(path):
     return data
 
 
+def retain_catalog_matches(result):
+    """Keep diagnostics only for entries that belong to the selected club catalog."""
+    matched_ids = {match.get("itemId") for match in result.get("matches", []) if match.get("itemId")}
+    result["items"] = [item for item in result.get("items", []) if item.get("id") in matched_ids]
+    from .presentation import classify
+    classify(result)
+    return result
+
+
 def safe_cover(name):
     p = PurePosixPath(name)
     return (not p.is_absolute() and len(p.parts) == 2 and p.parts[0] == "covers"
