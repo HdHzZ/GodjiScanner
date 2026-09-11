@@ -10,6 +10,7 @@ from .catalog import read_catalog, export_catalog, retain_catalog_matches
 from .core import Scanner, Cancelled
 from .proposals import build_proposals
 from .review import load_review, run_review
+from .club import available_catalogs, run_club_selector
 
 
 def emit(value):
@@ -39,6 +40,10 @@ def main(argv=None):
     actual_args = sys.argv[1:] if argv is None else argv
     if not actual_args:
         from .automatic import run_automatic
+        base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
+        catalogs_dir = base / "clubs"
+        if available_catalogs(catalogs_dir):
+            return run_club_selector(catalogs_dir, base / "club-results")
         return run_automatic(open_review=True)
     parser = argparse.ArgumentParser(description="GodjiOS discovery bridge (Windows 10/11)")
     parser.add_argument("--version", action="version", version=__version__)
@@ -145,7 +150,6 @@ def main(argv=None):
             summary = scan_club(args.catalog, args.output_dir, args.all_drives, args.include_reviewed, emit)
             write_result(summary, None)
         else:
-            from .club import run_club_selector
             run_club_selector(args.catalogs_dir, args.output_dir)
         return 0
     except (Cancelled, KeyboardInterrupt):
