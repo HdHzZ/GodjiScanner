@@ -61,7 +61,7 @@ class ScannerTests(unittest.TestCase):
         catalog = read_catalog(output)
         self.assertEqual(catalog["items"][0]["path"], str(client / "steam.exe"))
         self.assertEqual(catalog["items"][0]["args"], ["-applaunch", "730", "-cafeapplaunch"])
-        self.assertFalse(catalog["items"][1]["visible"])
+        self.assertTrue(catalog["items"][1]["visible"])
         with zipfile.ZipFile(output) as z:
             self.assertEqual(z.read("covers/cs.png"), b"test image bytes")
 
