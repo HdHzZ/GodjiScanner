@@ -2,8 +2,6 @@
 
 from datetime import datetime
 from pathlib import Path
-import shutil
-
 from .catalog import export_catalog, read_catalog, retain_catalog_matches
 from .core import Scanner
 
@@ -27,7 +25,7 @@ def available_catalogs(folder):
     return result
 
 
-def scan_club(catalog_path, output_dir, all_drives=True, include_reviewed=False, emit=None):
+def scan_club(catalog_path, output_dir, all_drives=True, include_reviewed=False, emit=None, source_label=None):
     """Search locally but retain and export only entries from one club's catalog."""
     catalog_path = Path(catalog_path).resolve()
     catalog = read_catalog(catalog_path)
@@ -43,7 +41,7 @@ def scan_club(catalog_path, output_dir, all_drives=True, include_reviewed=False,
         roots = fixed_drives()
     result = scanner.run(roots=roots, catalog=catalog, system=True)
     retain_catalog_matches(result)
-    result["clubCatalog"] = str(catalog_path)
+    result["clubCatalog"] = source_label or str(catalog_path)
     result["clubLabel"] = catalog_label(catalog_path)
     result["includedReviewedCandidates"] = bool(include_reviewed)
     from .automatic import save_reports
@@ -61,6 +59,17 @@ def scan_club(catalog_path, output_dir, all_drives=True, include_reviewed=False,
     return exported
 
 
+def scan_cloud_club(base_url, token, club, output_dir, all_drives=True, include_reviewed=False, emit=None):
+    """Fetch an API catalog into a temporary v3 template and scan only its entries."""
+    import tempfile
+    from .cloud_api import create_catalog_zip
+    with tempfile.TemporaryDirectory(prefix="GodjiScanner-cloud-") as temporary:
+        template = Path(temporary) / "catalog.zip"
+        create_catalog_zip(base_url, token, club, template)
+        return scan_club(template, output_dir, all_drives, include_reviewed, emit,
+                         source_label=f"Cloud API: {club['id']}")
+
+
 def default_output_folder(base, label):
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     safe = "".join(char if char.isalnum() or char in "-_ " else "_" for char in label).strip() or "club"
@@ -76,6 +85,7 @@ def run_club_selector(catalogs_dir, output_base):
         raise RuntimeError("Tkinter is unavailable; use a Windows build of GodjiScanner") from error
 
     catalog_paths = []
+    remote_records = []
     root = tk.Tk()
     root.title("GodjiScanner — сканирование клуба")
     root.geometry("700x470")
@@ -92,7 +102,7 @@ def run_club_selector(catalogs_dir, output_base):
 
     def refresh(extra=None):
         nonlocal catalog_paths
-        records = available_catalogs(catalogs_dir)
+        records = available_catalogs(catalogs_dir) + remote_records
         if extra:
             try:
                 records.append({"path": Path(extra), "label": catalog_label(extra), "items": len(read_catalog(extra)["items"])})
@@ -102,7 +112,8 @@ def run_club_selector(catalogs_dir, output_base):
         catalog_paths = records
         listbox.delete(0, "end")
         for record in records:
-            listbox.insert("end", f"{record['label']} — {record['items']} карточек")
+            suffix = "Cloud API" if record.get("source") == "cloud" else f"{record['items']} карточек"
+            listbox.insert("end", f"{record['label']} — {suffix}")
         if records:
             listbox.selection_set(0)
             status.set("Выберите клуб и запустите сканирование.")
@@ -111,6 +122,62 @@ def run_club_selector(catalogs_dir, output_base):
         path = filedialog.askopenfilename(title="Каталог GodjiOS", filetypes=[("GodjiOS catalog", "*.zip"), ("All files", "*.*")])
         if path:
             refresh(path)
+
+    def add_cloud_catalog():
+        from .cloud_api import list_clubs
+        window = tk.Toplevel(root)
+        window.title("Godji Cloud API")
+        window.transient(root)
+        window.grab_set()
+        panel = ttk.Frame(window, padding=16)
+        panel.pack(fill="both", expand=True)
+        ttk.Label(panel, text="Manager API key", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        ttk.Label(panel, text="Ключ используется только для этого запуска и не сохраняется на диск.").pack(anchor="w", pady=(3, 7))
+        token = tk.StringVar(value=__import__("os").environ.get("GODJI_MANAGER_API_KEY", ""))
+        url = tk.StringVar(value="https://cloud.godjios.ru")
+        ttk.Entry(panel, textvariable=token, show="•", width=58).pack(fill="x")
+        ttk.Label(panel, text="Адрес Cloud").pack(anchor="w", pady=(10, 2))
+        ttk.Entry(panel, textvariable=url, width=58).pack(fill="x")
+        clubs_box = tk.Listbox(panel, height=10, width=58, exportselection=False)
+        clubs = []
+        note = tk.StringVar(value="Введите ключ и нажмите «Получить клубы»." )
+
+        def load_clubs():
+            nonlocal clubs
+            try:
+                clubs = list_clubs(url.get(), token.get())
+            except Exception as error:
+                messagebox.showerror("GodjiScanner", str(error), parent=window)
+                return
+            clubs_box.delete(0, "end")
+            for club in clubs:
+                clubs_box.insert("end", club["name"])
+            if clubs:
+                clubs_box.selection_set(0)
+                note.set("Выберите клуб и добавьте его в список сканирования.")
+            else:
+                note.set("Для этого ключа нет доступных клубов.")
+
+        def select_cloud_club():
+            selected = clubs_box.curselection()
+            if not selected:
+                messagebox.showwarning("GodjiScanner", "Сначала выберите клуб.", parent=window)
+                return
+            club = clubs[selected[0]]
+            remote_records.append({"source": "cloud", "club": club, "token": token.get(), "baseUrl": url.get(),
+                                   "label": club["name"], "items": 0})
+            refresh()
+            listbox.selection_clear(0, "end")
+            listbox.selection_set(len(catalog_paths) - 1)
+            status.set("Клуб из Cloud добавлен. Запустите сканирование.")
+            window.destroy()
+
+        actions = ttk.Frame(panel)
+        actions.pack(fill="x", pady=(9, 3))
+        ttk.Button(actions, text="Получить клубы", command=load_clubs).pack(side="left")
+        ttk.Button(actions, text="Добавить выбранный клуб", command=select_cloud_club).pack(side="right")
+        clubs_box.pack(fill="both", expand=True)
+        ttk.Label(panel, textvariable=note, wraplength=440).pack(anchor="w", pady=(7, 0))
 
     def start():
         selected = listbox.curselection()
@@ -126,7 +193,11 @@ def run_club_selector(catalogs_dir, output_base):
                 status.set("Поиск: " + event.get("source", "…"))
                 root.update_idletasks()
         try:
-            exported = scan_club(record["path"], destination, deep_scan.get(), include_reviewed.get(), progress)
+            if record.get("source") == "cloud":
+                exported = scan_cloud_club(record["baseUrl"], record["token"], record["club"], destination,
+                                           deep_scan.get(), include_reviewed.get(), progress)
+            else:
+                exported = scan_club(record["path"], destination, deep_scan.get(), include_reviewed.get(), progress)
         except Exception as error:
             status.set("Ошибка сканирования")
             messagebox.showerror("GodjiScanner", str(error))
@@ -137,6 +208,7 @@ def run_club_selector(catalogs_dir, output_base):
     buttons = ttk.Frame(frame)
     buttons.pack(fill="x", pady=(10, 0))
     ttk.Button(buttons, text="Добавить каталог ZIP…", command=add_catalog).pack(side="left")
+    ttk.Button(buttons, text="Загрузить из Cloud…", command=add_cloud_catalog).pack(side="left", padx=(8, 0))
     ttk.Checkbutton(frame, text="Искать на всех локальных дисках", variable=deep_scan).pack(anchor="w", pady=(12, 2))
     ttk.Checkbutton(frame, text="Включить кандидаты, требующие проверки", variable=include_reviewed).pack(anchor="w")
     ttk.Button(frame, text="Сканировать клуб и создать ZIP", command=start).pack(anchor="e", pady=(10, 5))

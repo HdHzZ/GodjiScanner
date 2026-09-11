@@ -79,6 +79,13 @@ def main(argv=None):
     club_scan.add_argument("--output-dir", required=True, help="New folder for scan, report and import ZIP")
     club_scan.add_argument("--all-drives", action="store_true", help="Search all local fixed drives for this club")
     club_scan.add_argument("--include-reviewed", action="store_true", help="Also include non-ambiguous candidates requiring review")
+    cloud = commands.add_parser("cloud-club", help="Scan a club selected by its Godji Cloud catalog")
+    cloud.add_argument("--club-id", required=True, help="Club ID returned by the Cloud API")
+    cloud.add_argument("--output-dir", required=True, help="New folder for scan, report and import ZIP")
+    cloud.add_argument("--cloud-url", default="https://cloud.godjios.ru", help="Godji Cloud base URL")
+    cloud.add_argument("--api-key-env", default="GODJI_MANAGER_API_KEY", help="Environment variable containing the Manager API key")
+    cloud.add_argument("--all-drives", action="store_true", help="Search all local fixed drives for this club")
+    cloud.add_argument("--include-reviewed", action="store_true", help="Also include non-ambiguous candidates requiring review")
     clubs = commands.add_parser("clubs", help="Open the club selector and create an import ZIP")
     clubs.add_argument("--catalogs-dir", default="clubs", help="Folder containing exported club catalog ZIP files")
     clubs.add_argument("--output-dir", default="club-results", help="Folder where per-club result folders are created")
@@ -148,6 +155,18 @@ def main(argv=None):
         elif args.command == "club-scan":
             from .club import scan_club
             summary = scan_club(args.catalog, args.output_dir, args.all_drives, args.include_reviewed, emit)
+            write_result(summary, None)
+        elif args.command == "cloud-club":
+            from .cloud_api import list_clubs
+            from .club import scan_cloud_club
+            token = os.environ.get(args.api_key_env)
+            if not token:
+                raise ValueError("Manager API key is missing from environment variable " + args.api_key_env)
+            club = next((item for item in list_clubs(args.cloud_url, token) if item["id"] == args.club_id), None)
+            if not club:
+                raise ValueError("Club is not available to this Manager API key")
+            summary = scan_cloud_club(args.cloud_url, token, club, args.output_dir,
+                                      args.all_drives, args.include_reviewed, emit)
             write_result(summary, None)
         else:
             run_club_selector(args.catalogs_dir, args.output_dir)
