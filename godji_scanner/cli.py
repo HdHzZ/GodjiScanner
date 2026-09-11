@@ -41,10 +41,8 @@ def main(argv=None):
     if not actual_args:
         from .automatic import run_automatic
         base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
-        catalogs_dir = base / "clubs"
-        if available_catalogs(catalogs_dir):
-            return run_club_selector(catalogs_dir, base / "club-results")
-        return run_automatic(open_review=True)
+        return run_club_selector(base / "clubs", base / "club-results",
+                                 automatic=lambda: run_automatic(open_review=True))
     parser = argparse.ArgumentParser(description="GodjiOS discovery bridge (Windows 10/11)")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)

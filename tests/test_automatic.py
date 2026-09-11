@@ -10,17 +10,10 @@ from godji_scanner.core import Scanner, Cancelled
 
 
 class AutomaticTests(unittest.TestCase):
-    def test_no_arguments_selects_automatic_mode(self):
-        with patch("godji_scanner.cli.available_catalogs", return_value=[]):
-            with patch("godji_scanner.automatic.run_automatic", return_value=0) as automatic:
-                self.assertEqual(main([]), 0)
-                automatic.assert_called_once_with(open_review=True)
-
-    def test_no_arguments_selects_club_window_when_catalogs_exist(self):
-        with patch("godji_scanner.cli.available_catalogs", return_value=[{"label": "Бор"}]):
-            with patch("godji_scanner.cli.run_club_selector", return_value=0) as clubs:
-                self.assertEqual(main([]), 0)
-                clubs.assert_called_once()
+    def test_no_arguments_opens_choice_window(self):
+        with patch("godji_scanner.cli.run_club_selector", return_value=0) as clubs:
+            self.assertEqual(main([]), 0)
+            self.assertTrue(callable(clubs.call_args.kwargs["automatic"]))
 
     def test_without_catalog_produces_reports_with_real_executable_path(self):
         with tempfile.TemporaryDirectory() as temp:

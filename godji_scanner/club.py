@@ -76,7 +76,7 @@ def default_output_folder(base, label):
     return Path(base) / f"{safe}-{stamp}"
 
 
-def run_club_selector(catalogs_dir, output_base):
+def run_club_selector(catalogs_dir, output_base, automatic=None):
     """Open a simple operator UI to select a club catalog and produce an import ZIP."""
     try:
         import tkinter as tk
@@ -92,8 +92,8 @@ def run_club_selector(catalogs_dir, output_base):
     root.minsize(620, 400)
     frame = ttk.Frame(root, padding=18)
     frame.pack(fill="both", expand=True)
-    ttk.Label(frame, text="Выберите клуб", font=("Segoe UI", 15, "bold")).pack(anchor="w")
-    ttk.Label(frame, text="Каталог клуба сохраняет ID, категории и обложки для импорта в GodjiOS.").pack(anchor="w", pady=(4, 12))
+    ttk.Label(frame, text="Что нужно отсканировать?", font=("Segoe UI", 15, "bold")).pack(anchor="w")
+    ttk.Label(frame, text="Выберите клуб из Godji Cloud или ZIP-каталог. Полный поиск без списка тоже доступен ниже.").pack(anchor="w", pady=(4, 12))
     listbox = tk.Listbox(frame, height=11, exportselection=False)
     listbox.pack(fill="both", expand=True)
     status = tk.StringVar(value="Добавьте ZIP-каталог клуба в папку clubs или выберите его вручную.")
@@ -205,10 +205,18 @@ def run_club_selector(catalogs_dir, output_base):
         status.set("Готово")
         messagebox.showinfo("GodjiScanner", "Готов ZIP для импорта:\n" + exported["output"] + "\n\nОтчёт:\n" + exported["report"])
 
+    def start_automatic():
+        if automatic is None:
+            messagebox.showwarning("GodjiScanner", "Автоматический режим недоступен в этом запуске.")
+            return
+        root.destroy()
+        automatic()
+
     buttons = ttk.Frame(frame)
     buttons.pack(fill="x", pady=(10, 0))
-    ttk.Button(buttons, text="Добавить каталог ZIP…", command=add_catalog).pack(side="left")
-    ttk.Button(buttons, text="Загрузить из Cloud…", command=add_cloud_catalog).pack(side="left", padx=(8, 0))
+    ttk.Button(buttons, text="Выбрать ZIP-каталог…", command=add_catalog).pack(side="left")
+    ttk.Button(buttons, text="Выбрать клуб из Cloud…", command=add_cloud_catalog).pack(side="left", padx=(8, 0))
+    ttk.Button(buttons, text="Автоматический поиск без списка", command=start_automatic).pack(side="right")
     ttk.Checkbutton(frame, text="Искать на всех локальных дисках", variable=deep_scan).pack(anchor="w", pady=(12, 2))
     ttk.Checkbutton(frame, text="Включить кандидаты, требующие проверки", variable=include_reviewed).pack(anchor="w")
     ttk.Button(frame, text="Сканировать клуб и создать ZIP", command=start).pack(anchor="e", pady=(10, 5))
