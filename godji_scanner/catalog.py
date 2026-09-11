@@ -39,8 +39,12 @@ def read_catalog(path):
 
 
 def retain_catalog_matches(result):
-    """Keep diagnostics only for entries that belong to the selected club catalog."""
-    matched_ids = {match.get("itemId") for match in result.get("matches", []) if match.get("itemId")}
+    """Keep selected-club matches and every candidate needed for operator review."""
+    matched_ids = set()
+    for match in result.get("matches", []):
+        if match.get("itemId"):
+            matched_ids.add(match["itemId"])
+        matched_ids.update(item_id for item_id in match.get("candidateIds", []) if item_id)
     result["items"] = [item for item in result.get("items", []) if item.get("id") in matched_ids]
     from .presentation import classify
     classify(result)
@@ -55,7 +59,7 @@ def safe_cover(name):
 
 
 def export_catalog(result, destination, template=None, include_reviewed=False, assets_root=None):
-    """Never mutate the input archive; unresolved entries are retained but hidden."""
+    """Never mutate the input archive; unresolved entries retain their current state."""
     dest = Path(destination)
     if template and dest.resolve() == Path(template).resolve():
         raise ValueError("Output must not overwrite the template")

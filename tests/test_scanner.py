@@ -143,6 +143,15 @@ class ScannerTests(unittest.TestCase):
         retain_catalog_matches(result)
         self.assertEqual([item["title"] for item in result["items"]], ["Wanted"])
 
+    def test_only_catalog_filter_keeps_review_candidates(self):
+        scanner = Scanner()
+        scanner.add("Wanted", "C:/wanted.exe")
+        candidate = next(iter(scanner.items.values()))
+        result = {"items": [candidate], "matches": [{"catalogId": "wanted", "itemId": None,
+                  "candidateIds": [candidate["id"]], "status": "needs_review"}]}
+        retain_catalog_matches(result)
+        self.assertEqual(result["items"], [candidate])
+
     def test_cli_scan_and_approved_export(self):
         (self.root / "Game.exe").touch()
         output = self.root / "scan.json"
