@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import zipfile
 
-from godji_scanner.catalog import export_catalog, read_catalog, retain_catalog_matches
+from godji_scanner.catalog import export_catalog, read_catalog, retain_catalog_matches, remove_duplicate_launches
 from godji_scanner.core import Scanner, Cancelled, parse_vdf
 from godji_scanner.cli import main
 from godji_scanner.windows import split_args
@@ -104,6 +104,13 @@ class ScannerTests(unittest.TestCase):
             (self.root / name).touch()
         result = Scanner(max_files=1).run(roots=[self.root], system=False)
         self.assertTrue(result["partial"])
+
+    def test_duplicate_title_and_path_are_collapsed(self):
+        catalog = {"items": [{"id": "a", "title": "Google Chrome", "path": "C:/Chrome/chrome.exe"},
+                             {"id": "b", "title": "google   chrome", "path": "C:/Chrome/chrome.exe"},
+                             {"id": "c", "title": "Google Chrome", "path": ""}]}
+        self.assertEqual(remove_duplicate_launches(catalog), ["b"])
+        self.assertEqual([item["id"] for item in catalog["items"]], ["a", "c"])
 
     def test_unsafe_cover_rejected_without_partial_zip(self):
         template = self.template("covers/../../escape.png")

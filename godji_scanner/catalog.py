@@ -51,6 +51,26 @@ def retain_catalog_matches(result):
     return result
 
 
+def remove_duplicate_launches(data):
+    """Keep the first card for an identical user-facing title and launch path."""
+    kept = []
+    seen = set()
+    removed = []
+    for item in data["items"]:
+        title = " ".join(str(item.get("title", "")).casefold().split())
+        path = str(item.get("path") or "").replace("/", "\\").casefold()
+        # Empty paths are not duplicates: each needs separate operator review.
+        key = (title, path) if path else None
+        if key and key in seen:
+            removed.append(item["id"])
+            continue
+        if key:
+            seen.add(key)
+        kept.append(item)
+    data["items"] = kept
+    return removed
+
+
 def safe_cover(name):
     p = PurePosixPath(name)
     return (not p.is_absolute() and len(p.parts) == 2 and p.parts[0] == "covers"
@@ -113,6 +133,7 @@ def export_catalog(result, destination, template=None, include_reviewed=False, a
                 name = f"covers/local-{index}.png"
                 item["coverFile"] = name
                 local_covers[name] = path
+    removed_duplicates = remove_duplicate_launches(data)
     data["exportedAt"] = result["scannedAt"]
     dest.parent.mkdir(parents=True, exist_ok=True)
     created = False
@@ -141,4 +162,5 @@ def export_catalog(result, destination, template=None, include_reviewed=False, a
             dest.unlink(missing_ok=True)
         raise
     return {"output": str(dest.resolve()), "items": len(data["items"]),
-            "visible": sum(bool(i.get("visible")) for i in data["items"])}
+            "visible": sum(bool(i.get("visible")) for i in data["items"]),
+            "duplicatesRemoved": len(removed_duplicates)}
