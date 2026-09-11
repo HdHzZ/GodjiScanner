@@ -35,6 +35,7 @@ def scan_club(catalog_path, output_dir, all_drives=True, include_reviewed=False,
     output_dir.mkdir(parents=True)
     callback = emit or (lambda _: None)
     scanner = Scanner(callback, max_files=2_000_000)
+    scanner.exhaustive = bool(all_drives)
     roots = []
     if all_drives:
         from .windows import fixed_drives

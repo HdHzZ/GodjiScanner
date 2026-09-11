@@ -105,6 +105,20 @@ class ScannerTests(unittest.TestCase):
         result = Scanner(max_files=1).run(roots=[self.root], system=False)
         self.assertTrue(result["partial"])
 
+    def test_missing_known_game_is_confirmed_absent_after_deep_scan(self):
+        scanner = Scanner()
+        scanner.exhaustive = True
+        result = scanner.run(catalog={"items": [{"id": "sa", "title": "Grand Theft Auto San Andreas"}]}, system=False)
+        self.assertTrue(result["matches"][0]["absenceConfirmed"])
+        self.assertEqual(result["matches"][0]["status"], "not_found")
+
+    def test_known_game_executable_becomes_candidate(self):
+        game = self.root / "gta_sa.exe"
+        game.touch()
+        scanner = Scanner()
+        result = scanner.run(roots=[self.root], catalog={"items": [{"id": "sa", "title": "Grand Theft Auto San Andreas"}]}, system=False)
+        self.assertEqual(result["matches"][0]["status"], "needs_review")
+
     def test_duplicate_title_and_path_are_collapsed(self):
         catalog = {"items": [{"id": "a", "title": "Google Chrome", "path": "C:/Chrome/chrome.exe"},
                              {"id": "b", "title": "google   chrome", "path": "C:/Chrome/chrome.exe"},

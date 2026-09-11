@@ -105,9 +105,11 @@ def export_catalog(result, destination, template=None, include_reviewed=False, a
                 if not match.get("preserveArgs"):
                     item["args"] = found["launch"]["args"]
                 item["visible"] = item.get("visible", True)
-            # A scan can miss an installed program (for example, because its
-            # launcher is per-user or a disk was offline). Keep the club's
-            # existing Shell visibility; discovery must never hide content.
+            elif match["status"] == "not_found" and match.get("absenceConfirmed"):
+                # Hide only after an exhaustive scan checked an explicit game
+                # signature. A missing generic title is not proof of absence.
+                item["visible"] = False
+            # Other unresolved cards retain their current Shell visibility.
     else:
         data = {"version": 3, "clubId": result.get("clubId", ""), "categories": [], "items": []}
         for found in result["items"]:

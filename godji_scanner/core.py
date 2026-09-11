@@ -7,6 +7,13 @@ import time
 from datetime import datetime, timezone
 
 
+GAME_EXECUTABLE_ALIASES = {
+    "grandtheftautovicecity": {"gta-vc.exe", "gta_vc.exe"},
+    "grandtheftautosanandreas": {"gta_sa.exe"},
+    "grandtheftautoiv": {"gtaiv.exe", "gtaivlauncher.exe"},
+}
+
+
 def normalize(title):
     return "".join(c for c in title.casefold() if c.isalnum())
 
@@ -62,6 +69,7 @@ class Scanner:
         self.cancel_file = Path(cancel_file) if cancel_file else None
         self.max_files = max_files
         self.visited = 0
+        self.exhaustive = False
 
     def check(self):
         if self.cancel_file and self.cancel_file.exists():
@@ -208,11 +216,21 @@ class Scanner:
                 candidates = [i for i in self.items.values() if i.get("identity") == {"provider": "steam", "appId": appid}]
                 preserve = True
             else:
+                aliases = GAME_EXECUTABLE_ALIASES.get(normalize(entry["title"]), set())
+                if aliases:
+                    candidates = [i for i in self.items.values()
+                                  if Path(i["launch"]["path"]).name.casefold() in aliases]
+                    if not candidates:
+                        results.append({"catalogId": entry["id"], "title": entry["title"], "status": "not_found",
+                                        "itemId": None, "candidateIds": [], "preserveArgs": False,
+                                        "absenceConfirmed": bool(self.exhaustive)})
+                        continue
                 # Exact launch path AND arguments avoid confusing games sharing a launcher.
-                candidates = [i for i in self.items.values() if path and
-                              os.path.normcase(i["launch"]["path"]) == os.path.normcase(path) and
-                              i["launch"]["args"] == args and normalize(i["title"]) == normalize(entry["title"])]
-                preserve = bool(candidates)
+                if not candidates:
+                    candidates = [i for i in self.items.values() if path and
+                                  os.path.normcase(i["launch"]["path"]) == os.path.normcase(path) and
+                                  i["launch"]["args"] == args and normalize(i["title"]) == normalize(entry["title"])]
+                    preserve = bool(candidates)
                 if not candidates:
                     candidates = [i for i in self.items.values() if normalize(i["title"]) == normalize(entry["title"])]
                 if not candidates and path and Path(path).suffix.lower() == ".exe":
