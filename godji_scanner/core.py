@@ -65,6 +65,9 @@ class Scanner:
     def __init__(self, emit=None, cancel_file=None, max_files=200000):
         self.items = {}
         self.warnings = []
+        # Windows protects some system folders from ordinary users. Those
+        # access-denied diagnostics do not mean the application scan failed.
+        self.partial = False
         self.emit = emit or (lambda event: None)
         self.cancel_file = Path(cancel_file) if cancel_file else None
         self.max_files = max_files
@@ -75,9 +78,10 @@ class Scanner:
         if self.cancel_file and self.cancel_file.exists():
             raise Cancelled()
 
-    def warning(self, source, error):
+    def warning(self, source, error, partial=False):
         event = {"event": "warning", "source": source, "message": str(error)}
         self.warnings.append(event)
+        self.partial = self.partial or partial
         self.emit(event)
 
     def add(self, title, path, args=None, folder=None, source="filesystem", kind="program",
@@ -171,7 +175,7 @@ class Scanner:
             self.check()
             root = Path(root)
             if not root.is_dir():
-                self.warning("filesystem", f"Folder is unavailable: {root}")
+                self.warning("filesystem", f"Folder is unavailable: {root}", partial=True)
                 continue
             for directory, dirs, files in os.walk(root, followlinks=True,
                                                    onerror=lambda e: self.warning("filesystem", e)):
@@ -186,7 +190,7 @@ class Scanner:
                     self.check()
                     self.visited += 1
                     if self.visited > self.max_files:
-                        self.warning("filesystem", f"File limit reached ({self.max_files}); results are partial")
+                        self.warning("filesystem", f"File limit reached ({self.max_files}); results are partial", partial=True)
                         return
                     if self.visited % 2000 == 0:
                         self.emit({"event": "progress", "source": "filesystem", "filesVisited": self.visited})
@@ -292,7 +296,7 @@ class Scanner:
                   "clubId": catalog.get("clubId", "") if catalog else "",
                   "items": sorted(self.items.values(), key=lambda i: i["title"].casefold()),
                   "matches": matches, "warnings": self.warnings,
-                  "partial": bool(self.warnings), "durationSeconds": round(time.monotonic() - started, 3)}
+                  "partial": self.partial, "durationSeconds": round(time.monotonic() - started, 3)}
         from .presentation import classify
         classify(result)
         self.emit({"event": "completed", "items": len(result["items"]), "partial": result["partial"]})

@@ -105,6 +105,12 @@ class ScannerTests(unittest.TestCase):
         result = Scanner(max_files=1).run(roots=[self.root], system=False)
         self.assertTrue(result["partial"])
 
+    def test_access_denied_warning_does_not_mark_scan_partial(self):
+        scanner = Scanner()
+        scanner.warning("filesystem", PermissionError("access denied"))
+        result = scanner.run(system=False)
+        self.assertFalse(result["partial"])
+
     def test_missing_known_game_is_confirmed_absent_after_deep_scan(self):
         scanner = Scanner()
         scanner.exhaustive = True
